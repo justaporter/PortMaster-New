@@ -3,7 +3,8 @@
 set -e
 
 GAMEDIR="$(cd "$(dirname "$0")/.." && pwd)"
-RUNTIME="$GAMEDIR/runtime"
+RUNTIME="$GAMEDIR/chowdren-runtime"                  # mount point (empty folder)
+RUNTIME_SQUASH="$GAMEDIR/chowdren-runtime.squashfs"  # the runtime image shipped in the port
 BUILD="$GAMEDIR/build"
 GAMEDATA="$GAMEDIR/gamedata"
 STATE="$BUILD/.patch_state"
@@ -35,6 +36,8 @@ cleanup() {
         cp "$PATCHLOG" "$PATCHLOG_FINAL" 2>/dev/null
         rm -f "$PATCHLOG"
     fi
+    # Make sure the runtime image is never left mounted
+    $ESUDO umount "$RUNTIME" 2>/dev/null || true
 }
 trap cleanup EXIT
 trap 'kill 0 2>/dev/null; exit 1' HUP INT TERM
@@ -55,6 +58,18 @@ fail() {
 
 step_done() { [ -f "$STATE/$1" ] && [ "$(cat "$STATE/$1")" = "$2" ]; }
 mark_done() { echo "$2" > "$STATE/$1"; }
+
+# --- mount the chowdren runtime image ---------------------------------------
+if [ ! -f "$RUNTIME_SQUASH" ]; then
+    fail "chowdren-runtime.squashfs not found in $GAMEDIR"
+fi
+$ESUDO mkdir -p "$RUNTIME"
+if [[ "$PM_CAN_MOUNT" != "N" ]]; then
+    $ESUDO umount "$RUNTIME" 2>/dev/null || true
+fi
+$ESUDO mount "$RUNTIME_SQUASH" "$RUNTIME" || fail "Could not mount chowdren-runtime.squashfs"
+# the image is read-only, so don't let python try to write .pyc files into it
+export PYTHONDONTWRITEBYTECODE=1
 
 eval "$("$GAMEDIR/patch/detect_hw.bash")"
 export CHOWDREN_WORKERS
@@ -97,6 +112,9 @@ echo "=== Step 2/2: Cleaning up directory ==="
 mv "$BUILD/Chowdren" "$GAMEDIR/Chowdren" || $ESUDO mv "$BUILD/Chowdren" "$GAMEDIR/Chowdren" || fail "Failed to move Chowdren binary"
 mv "$BUILD/Assets.dat" "$GAMEDIR/Assets.dat" || $ESUDO mv "$BUILD/Assets.dat" "$GAMEDIR/Assets.dat" || fail "Failed to move Assets.dat"
 $ESUDO rm -rf "$BUILD"
+$ESUDO umount "$RUNTIME" || true
+$ESUDO rm -f "$RUNTIME_SQUASH"
+$ESUDO rmdir "$RUNTIME" 2>/dev/null || true
 $ESUDO rm -f "$GAME_EXE"
 touch "$GAMEDATA/.patched_complete"
 echo "Cleanup complete. OK"

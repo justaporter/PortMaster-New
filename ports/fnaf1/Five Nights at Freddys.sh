@@ -17,8 +17,6 @@ source $controlfolder/control.txt
 get_controls
 
 GAMEDIR=/$directory/ports/fnaf1
-RUNTIME_SQUASHFS="$GAMEDIR/libs/chowdren_runtime.squashfs"
-RUNTIME="$GAMEDIR/runtime"
 BUILD="$GAMEDIR/build"
 BIN="$GAMEDIR/Chowdren"
 GAME_EXE="$GAMEDIR/gamedata/FiveNightsatFreddys.exe"
@@ -38,28 +36,7 @@ if [ "$NEEDS_BUILD" -eq 1 ]; then
         exit 1
     fi
 
-    if [ ! -f "$RUNTIME_SQUASHFS" ]; then
-        pm_message "Runtime files missing. Reinstall the port so libs/chowdren_runtime.squashfs is present."
-        sleep 15
-        exit 1
-    fi
-
-    $ESUDO mkdir -p "$RUNTIME"
-    if [[ "$PM_CAN_MOUNT" != "N" ]]; then
-        $ESUDO umount "$RUNTIME" 2>/dev/null
-    fi
-    $ESUDO mount "$RUNTIME_SQUASHFS" "$RUNTIME" || fail_mount=1
-    if [ "$fail_mount" = "1" ] || ! mountpoint -q "$RUNTIME" 2>/dev/null; then
-        pm_message "Failed to mount build runtime. Your device/CFW may not support squashfs loop mounts."
-        sleep 15
-        exit 1
-    fi
-
-    $ESUDO chmod +x "$RUNTIME/bin/chowdren-build" \
-        "$RUNTIME/toolchain/bin/cmake" "$RUNTIME/toolchain/bin/zcc" "$RUNTIME/toolchain/bin/zcxx" \
-        "$RUNTIME/toolchain/bin/make" \
-        "$RUNTIME/python27/bin/python2.7" "$RUNTIME/zig/zig" "$RUNTIME/tools/astcenc-native" \
-        "$GAMEDIR/patch/patch.bash" "$GAMEDIR/patch/detect_hw.bash" \
+    $ESUDO chmod +x "$GAMEDIR/patch/patch.bash" "$GAMEDIR/patch/detect_hw.bash" \
         "$GAMEDIR/patch/apply_source_patches.bash" 2>/dev/null
 
     export PATCHER_FILE="$GAMEDIR/patch/patch.bash"
@@ -75,11 +52,6 @@ if [ "$NEEDS_BUILD" -eq 1 ]; then
         sleep 15
         exit 1
     fi
-
-    if [[ "$PM_CAN_MOUNT" != "N" ]]; then
-        $ESUDO umount "$RUNTIME" 2>/dev/null
-    fi
-    $ESUDO rmdir "$RUNTIME" 2>/dev/null
 
     if [ ! -f "$PATCHED_FLAG" ] || [ ! -x "$BIN" ]; then
         echo "Build failed"
